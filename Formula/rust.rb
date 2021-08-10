@@ -2,24 +2,24 @@ class Rust < Formula
   desc "Safe, concurrent, practical language"
   homepage "https://www.rust-lang.org/"
   license any_of: ["Apache-2.0", "MIT"]
+  revision 1
 
   stable do
-    url "https://static.rust-lang.org/dist/rustc-1.53.0-src.tar.gz"
-    sha256 "5cf7ca39a10f6bf4e0b0bd15e3b9a61ce721f301e12d148262e5ba968ab825b9"
+    url "https://static.rust-lang.org/dist/rustc-1.49.0-src.tar.gz"
+    sha256 "b50aefa8df1fdfc9bccafdbf37aee611c8dfe81bf5648d5f43699c50289dc779"
 
     resource "cargo" do
       url "https://github.com/rust-lang/cargo.git",
-          tag:      "0.54.0",
-          revision: "4369396ce7d270972955d876eaa4954bea56bcd9"
+          tag:      "0.50.0",
+          revision: "d00d64df9f803bf5bba8714ca498d8f9159d07f6"
     end
   end
 
   bottle do
-    sha256 cellar: :any,                 arm64_big_sur: "9322cd3fb212941b29c00814f7df98ae5089e33c64da35b04b6c5a78d7318a55"
-    sha256 cellar: :any,                 big_sur:       "e6147d6ca4c244701b3f2cefd473083678834111ae3db499c86a7ceab257967c"
-    sha256 cellar: :any,                 catalina:      "aef878e07eba19a1ffa38a3d766344cae6f9acafc85c1d8dc375255c02e8d791"
-    sha256 cellar: :any,                 mojave:        "998b27b5b81d1aa3283cec32fd5d7a17e7b98e10cd06a661d21653541e3a0bce"
-    sha256 cellar: :any_skip_relocation, x86_64_linux:  "5165435f8e1413cefc7c93806385e580c228fc9f366e5f646764458c89669109"
+    sha256 cellar: :any, arm64_big_sur: "3250b7351f1e18dac3c32a644540af565d782b06c8b814245ce057f2ff5c9f90"
+    sha256 cellar: :any, big_sur:       "5a238d58c3fa775fed4e12ad74109deff54a82a06cb6a3a4f51b5d37587fb319"
+    sha256 cellar: :any, catalina:      "2c2cead3d8c53417dc6b966deceab030719851a671389e1e29153988668becc4"
+    sha256 cellar: :any, mojave:        "ba2226b86bf857d3c5da9b5023ad120bd8740333cc9798d7b13b851e0e782aa4"
   end
 
   head do
@@ -44,18 +44,18 @@ class Rust < Formula
     on_macos do
       # From https://github.com/rust-lang/rust/blob/#{version}/src/stage0.txt
       if Hardware::CPU.arm?
-        url "https://static.rust-lang.org/dist/2021-05-06/cargo-1.52.0-aarch64-apple-darwin.tar.gz"
-        sha256 "86b3d0515e80515fd93612502049e630aeba3478e45c1d6ca765002b4c2e7fd8"
+        url "https://static.rust-lang.org/dist/2020-12-31/cargo-1.49.0-aarch64-apple-darwin.tar.gz"
+        sha256 "2bd6eb276193b70b871c594ed74641235c8c4dcd77e9b8f193801c281b55478d"
       else
-        url "https://static.rust-lang.org/dist/2021-05-06/cargo-1.52.0-x86_64-apple-darwin.tar.gz"
-        sha256 "02a4be4aae1c99ca1e325f9dbe4d65eba488fd11338d8620f8df46d010ffbf3a"
+        url "https://static.rust-lang.org/dist/2020-12-31/cargo-1.49.0-x86_64-apple-darwin.tar.gz"
+        sha256 "ab1bcd7840c715832dbe4a2c5cd64882908cc0d0e6686dd6aec43d2e4332a003"
       end
     end
 
     on_linux do
       # From: https://github.com/rust-lang/rust/blob/#{version}/src/stage0.txt
-      url "https://static.rust-lang.org/dist/2021-05-06/cargo-1.52.0-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "85151d458672529692470eb85df30a46a4327e53a7e838ec65587f2c1680d559"
+      url "https://static.rust-lang.org/dist/2020-12-31/cargo-1.49.0-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "900597323df24703a38f58e40ede5c3f70e105ddc296e2b90efe6fe2895278fe"
     end
   end
 
@@ -64,11 +64,18 @@ class Rust < Formula
 
     # Fix build failure for compiler_builtins "error: invalid deployment target
     # for -stdlib=libc++ (requires OS X 10.7 or later)"
-    on_macos { ENV["MACOSX_DEPLOYMENT_TARGET"] = MacOS.version }
+    ENV["MACOSX_DEPLOYMENT_TARGET"] = MacOS.version
 
     # Ensure that the `openssl` crate picks up the intended library.
     # https://crates.io/crates/openssl#manual-configuration
     ENV["OPENSSL_DIR"] = Formula["openssl@1.1"].opt_prefix
+
+    # Fix build failure for cmake v0.1.24 "error: internal compiler error:
+    # src/librustc/ty/subst.rs:127: impossible case reached" on 10.11, and for
+    # libgit2-sys-0.6.12 "fatal error: 'os/availability.h' file not found
+    # #include <os/availability.h>" on 10.11 and "SecTrust.h:170:67: error:
+    # expected ';' after top level declarator" among other errors on 10.12
+    ENV["SDKROOT"] = MacOS.sdk_path
 
     args = ["--prefix=#{prefix}"]
     if build.head?
@@ -76,6 +83,12 @@ class Rust < Formula
       args << "--release-channel=nightly"
     else
       args << "--release-channel=stable"
+    end
+
+    if Hardware::CPU.arm?
+      # Fix for 1.49.0-beta, remove when the 2nd stable ARM version is released
+      inreplace "src/stage0.txt", "1.48.0", "1.49.0"
+      inreplace "src/stage0.txt", "2020-11-19", "2020-12-31"
     end
 
     system "./configure", *args
@@ -89,10 +102,7 @@ class Rust < Formula
 
     resource("cargo").stage do
       ENV["RUSTC"] = bin/"rustc"
-      args = %W[--root #{prefix} --path .]
-      on_macos do
-        args += %w[--features curl-sys/force-system-lib-on-osx]
-      end
+      args = %W[--root #{prefix} --path . --features curl-sys/force-system-lib-on-osx]
       system "cargo", "install", *args
       man1.install Dir["src/etc/man/*.1"]
       bash_completion.install "src/etc/cargo.bashcomp.sh"
